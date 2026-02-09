@@ -1,0 +1,21 @@
+name = "keep-alive-worker"
+main = "src/index.js"
+compatibility_date = "2025-06-17"
+
+# Cron trigger: runs every 1 minute to check due tasks
+# Adjust as needed. Free plan supports up to 5 cron triggers.
+# Examples: "*/5 * * * *" (every 5 min), "*/1 * * * *" (every 1 min)
+[triggers]
+crons = ["*/1 * * * *"]
+
+# Set admin password via: wrangler secret put ADMIN_PASSWORD
+# Or uncomment below for quick testing (not recommended for production)
+# [vars]
+# ADMIN_PASSWORD = "change-me"
+
+# Step 1: Create KV namespace:
+#   wrangler kv namespace create "KEEP_ALIVE"
+# Step 2: Replace the id below with the output id
+[[kv_namespaces]]
+binding = "KV"
+id = "00000000000000000000000000000000"
