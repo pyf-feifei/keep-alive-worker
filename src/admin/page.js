@@ -197,21 +197,24 @@ const I18N = {
     recentActivity:'Recent Activity',
     rTime:'Time',rTask:'Task',rUrl:'URL',rStatus:'Status',rDuration:'Duration',
     addTask:'Add Task',editTask:'Edit Task',
-    name:'Name',url:'URL',method:'Method',headers:'Headers',body:'Body',
-    interval:'Interval',timeout:'Timeout',status:'Status',lastCheck:'Last Check',
-    uptime:'Uptime',actions:'Actions',
-    namePlaceholder:'e.g. HF Space',urlPlaceholder:'https://your-app.hf.space/',
+    name:'Name',url:'URL',urls:'URLs',method:'Method',headers:'Headers',body:'Body',
+    interval:'Interval',jitter:'Jitter',timeout:'Timeout',status:'Status',lastCheck:'Last Check',
+    nextCheck:'Next Check',lastUrl:'Last URL',
+    uptime:'Uptime',actions:'Actions',urlCount:'URLs',
+    namePlaceholder:'e.g. HF Space',
+    urlsPlaceholder:'https://your-app.hf.space/\nhttps://another-app.hf.space/\nhttps://third-app.hf.space/',
+    urlsHelp:'One URL per line. A random URL will be picked each time.',
     headersHelp:'One per line: Key: Value',headersPlaceholder:'Content-Type: application/json',
     bodyPlaceholder:'Request body (JSON, etc.)',
-    intervalHelp:'Minutes between checks (min 1)',timeoutHelp:'Seconds (max 120)',
+    intervalHelp:'Base interval in minutes',jitterHelp:'Random variation (e.g. 30% means interval +/-30%)',timeoutHelp:'Seconds (max 120)',
     on:'On',off:'Off',edit:'Edit',disable:'Disable',enable:'Enable',
     delete:'Delete',trigger:'Trigger',logs:'Logs',
     noTasks:'No tasks yet. Click "Add Task" to get started.',
     cancel:'Cancel',save:'Save',
     confirmDelete:'Confirm Delete',confirmDeleteMsg:'Delete <strong>{name}</strong>? This cannot be undone.',
     deleted:'Deleted',taskUpdated:'Task updated',taskCreated:'Task created',
-    urlRequired:'URL is required',saveFailed:'Save failed',failed:'Failed',
-    triggerOk:'Check completed',triggerFail:'Check failed',
+    urlRequired:'At least one URL is required',saveFailed:'Save failed',failed:'Failed',
+    triggerOk:'Check completed',triggerFail:'Check failed',randomInfo:'Random',
     logsTitle:'Check Logs',noLogs:'No logs yet.',
     neverChecked:'Never',ago:'{n} ago',justNow:'Just now',
     enterPwd:'Please enter password',loginFailed:'Login failed',
@@ -225,21 +228,24 @@ const I18N = {
     recentActivity:'最近活动',
     rTime:'时间',rTask:'任务',rUrl:'URL',rStatus:'状态',rDuration:'耗时',
     addTask:'添加任务',editTask:'编辑任务',
-    name:'名称',url:'URL',method:'请求方式',headers:'请求头',body:'请求体',
-    interval:'间隔',timeout:'超时',status:'状态',lastCheck:'最后检查',
-    uptime:'成功率',actions:'操作',
-    namePlaceholder:'例如 HF Space',urlPlaceholder:'https://your-app.hf.space/',
+    name:'名称',url:'URL',urls:'URL 列表',method:'请求方式',headers:'请求头',body:'请求体',
+    interval:'间隔',jitter:'随机波动',timeout:'超时',status:'状态',lastCheck:'最后检查',
+    nextCheck:'下次检查',lastUrl:'上次 URL',
+    uptime:'成功率',actions:'操作',urlCount:'URL 数',
+    namePlaceholder:'例如 HF Space',
+    urlsPlaceholder:'https://your-app.hf.space/\nhttps://another-app.hf.space/\nhttps://third-app.hf.space/',
+    urlsHelp:'每行一个 URL，每次检查时随机选一个发送请求。',
     headersHelp:'每行一个: Key: Value',headersPlaceholder:'Content-Type: application/json',
     bodyPlaceholder:'请求体 (JSON 等)',
-    intervalHelp:'检查间隔，单位分钟 (最小 1)',timeoutHelp:'超时秒数 (最大 120)',
+    intervalHelp:'基础间隔，单位分钟',jitterHelp:'随机波动幅度 (如 30% 表示间隔 ±30%)',timeoutHelp:'超时秒数 (最大 120)',
     on:'启用',off:'停用',edit:'编辑',disable:'禁用',enable:'启用',
     delete:'删除',trigger:'触发',logs:'日志',
     noTasks:'暂无任务，点击「添加任务」开始。',
     cancel:'取消',save:'保存',
     confirmDelete:'确认删除',confirmDeleteMsg:'确定删除 <strong>{name}</strong>？此操作不可撤销。',
     deleted:'已删除',taskUpdated:'任务已更新',taskCreated:'任务已创建',
-    urlRequired:'URL 不能为空',saveFailed:'保存失败',failed:'操作失败',
-    triggerOk:'检查完成',triggerFail:'检查失败',
+    urlRequired:'至少需要一个 URL',saveFailed:'保存失败',failed:'操作失败',
+    triggerOk:'检查完成',triggerFail:'检查失败',randomInfo:'随机',
     logsTitle:'检查日志',noLogs:'暂无日志。',
     neverChecked:'从未检查',ago:'{n}前',justNow:'刚刚',
     enterPwd:'请输入密码',loginFailed:'登录失败',
@@ -325,17 +331,18 @@ function renderDashboard() {
 
   // Recent activity
   document.getElementById('recent-title').textContent=t('recentActivity');
-  document.getElementById('recent-thead').innerHTML='<th>'+[t('rTask'),t('rUrl'),t('method'),t('interval'),t('lastCheck'),t('rStatus'),t('rDuration')].join('</th><th>')+'</th>';
+  document.getElementById('recent-thead').innerHTML='<th>'+[t('rTask'),t('lastUrl'),t('method'),t('interval'),t('lastCheck'),t('nextCheck'),t('rStatus'),t('rDuration')].join('</th><th>')+'</th>';
   const sorted = [...tasks].filter(t=>t.last_check).sort((a,b)=>new Date(b.last_check)-new Date(a.last_check));
   const tb = document.getElementById('recent-tbody');
-  if (!sorted.length) { tb.innerHTML='<tr><td colspan="7" class="empty">'+t('noTasks')+'</td></tr>'; return; }
+  if (!sorted.length) { tb.innerHTML='<tr><td colspan="8" class="empty">'+t('noTasks')+'</td></tr>'; return; }
   tb.innerHTML = sorted.slice(0,10).map(tk => \`
     <tr>
       <td><span class="dot \${statusDot(tk)}"></span>\${esc(tk.name)}</td>
-      <td class="cell-truncate" title="\${esc(tk.url)}">\${esc(tk.url)}</td>
+      <td class="cell-truncate" title="\${esc(tk.last_url||tk.url)}">\${esc(tk.last_url||tk.url)}</td>
       <td><span class="badge badge-method">\${tk.method||'GET'}</span></td>
-      <td>\${tk.interval} \${t('min')}</td>
+      <td>\${tk.interval} \${t('min')} <span style="color:var(--text-2);font-size:11px">±\${tk.jitter??20}%</span></td>
       <td>\${timeAgo(tk.last_check)}</td>
+      <td>\${tk.next_check ? timeAgo(tk.next_check, true) : '-'}</td>
       <td>\${statusBadge(tk.last_status, tk.last_error)}</td>
       <td>\${tk.last_duration != null ? tk.last_duration + t('ms') : '-'}</td>
     </tr>
@@ -346,18 +353,20 @@ function renderDashboard() {
 function renderTasksSection() {
   document.getElementById('tasks-title').textContent=t('tasks');
   document.getElementById('tasks-add-btn').textContent=t('addTask');
-  document.getElementById('tasks-thead').innerHTML='<th>'+[t('status'),t('name'),t('url'),t('method'),t('interval'),t('lastCheck'),t('rStatus'),t('uptime'),t('actions')].join('</th><th>')+'</th>';
+  document.getElementById('tasks-thead').innerHTML='<th>'+[t('status'),t('name'),t('urlCount'),t('method'),t('interval'),t('lastCheck'),t('rStatus'),t('uptime'),t('actions')].join('</th><th>')+'</th>';
   const tb = document.getElementById('tasks-tbody');
   if (!tasks.length) { tb.innerHTML='<tr><td colspan="9" class="empty">'+t('noTasks')+'</td></tr>'; return; }
   tb.innerHTML = tasks.map(tk => {
     const total = (tk.success_count||0)+(tk.fail_count||0);
     const uptime = total > 0 ? ((tk.success_count||0)/total*100).toFixed(1)+'%' : '-';
+    const urlCount = tk.urls?.length || (tk.url ? 1 : 0);
+    const urlTitle = (tk.urls||[tk.url]).join('\\n');
     return \`<tr>
       <td><span class="badge \${tk.enabled?'badge-on':'badge-off'}">\${tk.enabled?t('on'):t('off')}</span></td>
       <td><span class="dot \${statusDot(tk)}"></span><strong>\${esc(tk.name)}</strong></td>
-      <td class="cell-truncate" title="\${esc(tk.url)}">\${esc(tk.url)}</td>
+      <td title="\${esc(urlTitle)}"><span style="color:var(--primary);font-weight:600">\${urlCount}</span> <span style="color:var(--text-2);font-size:12px">\${t('randomInfo')}</span></td>
       <td><span class="badge badge-method">\${tk.method||'GET'}</span></td>
-      <td>\${tk.interval} \${t('min')}</td>
+      <td>\${tk.interval} \${t('min')} <span style="color:var(--text-2);font-size:11px">±\${tk.jitter??20}%</span></td>
       <td>\${tk.last_check ? timeAgo(tk.last_check) : t('neverChecked')}</td>
       <td>\${statusBadge(tk.last_status, tk.last_error)}</td>
       <td>\${uptime}</td>
@@ -377,18 +386,22 @@ function showTaskModal(id) {
   const tk = id ? tasks.find(t=>t.id===id) : null;
   const title = tk ? t('editTask') : t('addTask');
   const hdrStr = tk && tk.headers ? Object.entries(tk.headers).map(([k,v])=>k+': '+v).join('\\n') : '';
-  const showBody = (v) => { document.getElementById('f-body-group').style.display=['POST','PUT','PATCH'].includes(v)?'block':'none'; };
+  const urlsStr = tk ? (tk.urls||[tk.url]).join('\\n') : '';
+  const jitterVal = tk ? (tk.jitter ?? 20) : 20;
   openModal(\`
     <h3>\${title}</h3>
     <div class="form-group"><label>\${t('name')}</label><input id="f-name" value="\${tk?esc(tk.name):''}" placeholder="\${t('namePlaceholder')}"></div>
-    <div class="form-group"><label>\${t('url')}</label><input id="f-url" value="\${tk?esc(tk.url):''}" placeholder="\${t('urlPlaceholder')}"></div>
-    <div class="form-row-3">
+    <div class="form-group"><label>\${t('urls')}</label><textarea id="f-urls" placeholder="\${t('urlsPlaceholder')}" style="min-height:80px">\${urlsStr}</textarea><div class="form-help">\${t('urlsHelp')}</div></div>
+    <div class="form-row">
       <div class="form-group"><label>\${t('method')}</label>
         <select id="f-method" onchange="document.getElementById('f-body-group').style.display=['POST','PUT','PATCH'].includes(this.value)?'block':'none'">
           \${['GET','POST','PUT','PATCH','DELETE','HEAD'].map(m=>'<option'+(tk&&tk.method===m?' selected':(!tk&&m==='GET'?' selected':''))+'>'+m+'</option>').join('')}
         </select>
       </div>
       <div class="form-group"><label>\${t('interval')} (\${t('min')})</label><input type="number" id="f-interval" value="\${tk?tk.interval:5}" min="1"><div class="form-help">\${t('intervalHelp')}</div></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>\${t('jitter')} (%)</label><input type="number" id="f-jitter" value="\${jitterVal}" min="0" max="50"><div class="form-help">\${t('jitterHelp')}</div></div>
       <div class="form-group"><label>\${t('timeout')} (\${t('sec')})</label><input type="number" id="f-timeout" value="\${tk?tk.timeout:30}" min="1" max="120"><div class="form-help">\${t('timeoutHelp')}</div></div>
     </div>
     <div class="form-group"><label>\${t('headers')}</label><textarea id="f-headers" placeholder="\${t('headersPlaceholder')}" style="min-height:60px">\${hdrStr}</textarea><div class="form-help">\${t('headersHelp')}</div></div>
@@ -401,15 +414,16 @@ function showTaskModal(id) {
 }
 
 async function saveTask(id) {
-  const url = document.getElementById('f-url').value.trim();
-  if (!url) { toast(t('urlRequired'),'error'); return; }
+  const urlsRaw = document.getElementById('f-urls').value.trim();
+  if (!urlsRaw) { toast(t('urlRequired'),'error'); return; }
   const data = {
     name: document.getElementById('f-name').value.trim(),
-    url,
+    urls: urlsRaw,
     method: document.getElementById('f-method').value,
     headers: document.getElementById('f-headers').value,
     body: document.getElementById('f-body')?.value || '',
     interval: parseInt(document.getElementById('f-interval').value) || 5,
+    jitter: parseInt(document.getElementById('f-jitter').value) ?? 20,
     timeout: parseInt(document.getElementById('f-timeout').value) || 30,
   };
   const r = id
@@ -428,8 +442,9 @@ async function doTrigger(id) {
   toast('Checking...','');
   const r = await api('/tasks/'+id+'/trigger',{method:'POST'});
   if (r) {
-    if (r.status >= 200 && r.status < 400) toast(t('triggerOk')+' ('+r.status+', '+r.duration+t('ms')+')','success');
-    else toast(t('triggerFail')+': '+(r.error||'HTTP '+r.status),'error');
+    const urlShort = r.url ? r.url.replace(/^https?:\\/\\//, '').slice(0,40) : '';
+    if (r.status >= 200 && r.status < 400) toast(t('triggerOk')+' ('+r.status+', '+r.duration+t('ms')+') -> '+urlShort,'success');
+    else toast(t('triggerFail')+': '+(r.error||'HTTP '+r.status)+' -> '+urlShort,'error');
     await loadData(); render();
   }
 }
@@ -440,12 +455,13 @@ async function showLogs(id, name) {
   let html = \`<h3>\${t('logsTitle')} - \${name}</h3>\`;
   if (!logs.length) { html += '<p class="empty">'+t('noLogs')+'</p>'; }
   else {
-    html += '<div style="max-height:400px;overflow-y:auto"><table class="log-table"><thead><tr><th>'+t('rTime')+'</th><th>'+t('rStatus')+'</th><th>'+t('rDuration')+'</th><th>Error</th></tr></thead><tbody>';
+    html += '<div style="max-height:400px;overflow-y:auto"><table class="log-table"><thead><tr><th>'+t('rTime')+'</th><th>'+t('url')+'</th><th>'+t('rStatus')+'</th><th>'+t('rDuration')+'</th><th>Error</th></tr></thead><tbody>';
     html += logs.map(l => \`<tr>
-      <td>\${new Date(l.time).toLocaleString()}</td>
+      <td style="white-space:nowrap">\${new Date(l.time).toLocaleString()}</td>
+      <td class="cell-truncate" style="max-width:200px;font-size:12px" title="\${esc(l.url||'')}">\${esc(l.url||'-')}</td>
       <td>\${statusBadge(l.status, l.error)}</td>
       <td>\${l.duration}\${t('ms')}</td>
-      <td style="color:var(--danger);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="\${esc(l.error||'')}">\${esc(l.error||'-')}</td>
+      <td style="color:var(--danger);font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="\${esc(l.error||'')}">\${esc(l.error||'-')}</td>
     </tr>\`).join('');
     html += '</tbody></table></div>';
   }
@@ -477,9 +493,16 @@ function statusBadge(status, error) {
   if (status>=300&&status<400) return '<span class="badge badge-status-warn">'+status+'</span>';
   return '<span class="badge badge-status-err">'+status+'</span>';
 }
-function timeAgo(iso) {
+function timeAgo(iso, future) {
   if (!iso) return '-';
   const diff = Date.now()-new Date(iso).getTime();
+  if (future && diff < 0) {
+    // Future time - show "in X min"
+    const abs = Math.abs(diff);
+    if (abs<60000) return '<1'+t('min');
+    if (abs<3600000) return Math.floor(abs/60000)+t('min');
+    return Math.floor(abs/3600000)+'h';
+  }
   if (diff<60000) return t('justNow');
   if (diff<3600000) return t('ago').replace('{n}',Math.floor(diff/60000)+t('min'));
   if (diff<86400000) return t('ago').replace('{n}',Math.floor(diff/3600000)+'h');

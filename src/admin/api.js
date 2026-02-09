@@ -13,24 +13,32 @@ export async function handleAdminApi(request, env, store) {
 
     if (path === '/tasks' && method === 'POST') {
       const data = await request.json();
-      if (!data.url) return jsonRes({ error: 'URL is required' }, 400);
+      const urls = parseUrls(data.urls);
+      if (urls.length === 0) return jsonRes({ error: 'At least one URL is required' }, 400);
+
+      const interval = Math.max(1, parseInt(data.interval) || 5);
+      const jitter = Math.max(0, Math.min(50, parseInt(data.jitter) ?? 20));
 
       const tasks = await store.getTasks();
       const task = {
         id: crypto.randomUUID(),
         name: (data.name || '').trim() || 'Unnamed',
-        url: data.url.trim(),
+        url: urls[0],                // primary URL (backward compat / display)
+        urls,                        // full URL pool
         method: data.method || 'GET',
         headers: parseHeaders(data.headers),
         body: data.body || '',
-        interval: Math.max(1, parseInt(data.interval) || 5),
+        interval,
+        jitter,
         timeout: Math.max(1, Math.min(120, parseInt(data.timeout) || 30)),
         enabled: data.enabled !== false,
         created_at: new Date().toISOString(),
+        next_check: null,            // will be set after first check
         last_check: null,
         last_status: null,
         last_duration: null,
         last_error: null,
+        last_url: null,              // which URL was actually used last time
         success_count: 0,
         fail_count: 0,
       };
@@ -51,14 +59,18 @@ export async function handleAdminApi(request, env, store) {
         if (idx === -1) return jsonRes({ error: 'Task not found' }, 404);
 
         const t = tasks[idx];
+        const urls = data.urls !== undefined ? parseUrls(data.urls) : t.urls;
+
         tasks[idx] = {
           ...t,
           name: data.name !== undefined ? (data.name || '').trim() || 'Unnamed' : t.name,
-          url: data.url !== undefined ? data.url.trim() : t.url,
+          url: urls.length > 0 ? urls[0] : t.url,
+          urls: urls.length > 0 ? urls : t.urls,
           method: data.method !== undefined ? data.method : t.method,
           headers: data.headers !== undefined ? parseHeaders(data.headers) : t.headers,
           body: data.body !== undefined ? data.body : t.body,
           interval: data.interval !== undefined ? Math.max(1, parseInt(data.interval) || 5) : t.interval,
+          jitter: data.jitter !== undefined ? Math.max(0, Math.min(50, parseInt(data.jitter) ?? 20)) : (t.jitter ?? 20),
           timeout: data.timeout !== undefined ? Math.max(1, Math.min(120, parseInt(data.timeout) || 30)) : t.timeout,
           enabled: data.enabled !== undefined ? data.enabled : t.enabled,
           id, // preserve
@@ -85,6 +97,8 @@ export async function handleAdminApi(request, env, store) {
       const idx = tasks.findIndex(t => t.id === id);
       if (idx === -1) return jsonRes({ error: 'Task not found' }, 404);
       tasks[idx].enabled = !tasks[idx].enabled;
+      // Reset next_check when re-enabling so it triggers soon
+      if (tasks[idx].enabled) tasks[idx].next_check = null;
       await store.saveTasks(tasks);
       return jsonRes(tasks[idx]);
     }
@@ -114,6 +128,18 @@ export async function handleAdminApi(request, env, store) {
     console.error('Admin API error:', err);
     return jsonRes({ error: err.message || 'Internal error' }, 500);
   }
+}
+
+/**
+ * Parse URLs from string (one per line) or array.
+ */
+function parseUrls(input) {
+  if (!input) return [];
+  if (Array.isArray(input)) return input.map(u => u.trim()).filter(Boolean);
+  if (typeof input === 'string') {
+    return input.split('\n').map(u => u.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 /**
